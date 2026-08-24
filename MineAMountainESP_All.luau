@@ -36,7 +36,7 @@ if _G.espUI then _G.espUI.stop(); _G.espUI = nil end
 local DrawUI = {}
 DrawUI.controls = {}
 DrawUI.allObjs = {}
-DrawUI.w = 230
+DrawUI.w = 244
 DrawUI.x = 0
 DrawUI.y = 0
 DrawUI.titleText = "MENU"
@@ -45,15 +45,50 @@ DrawUI.dirty = true
 DrawUI.rows = {}
 DrawUI.drag = nil
 DrawUI.running = true
-local ROW_H = 22
-local TITLE_H = 26
-local PAD = 6
+local ROW_H = 24
+local TITLE_H = 30
+local PAD = 10
+local R = 10
+local C = {
+    bg       = Color3.fromRGB(8, 18, 13),
+    scan     = Color3.fromRGB(0, 0, 0),
+    border   = Color3.fromRGB(120, 255, 150),
+    titlebar = Color3.fromRGB(70, 210, 130),
+    row      = Color3.fromRGB(14, 30, 22),
+    divider  = Color3.fromRGB(50, 110, 80),
+    text     = Color3.fromRGB(232, 255, 242),
+    muted    = Color3.fromRGB(160, 215, 180),
+    accent   = Color3.fromRGB(120, 255, 150),
+    on       = Color3.fromRGB(120, 220, 255),
+    onGlow   = Color3.fromRGB(120, 220, 255),
+    off      = Color3.fromRGB(74, 96, 84),
+    knob     = Color3.fromRGB(246, 248, 252),
+    optSel   = Color3.fromRGB(22, 54, 74),
+    optBg    = Color3.fromRGB(12, 26, 19),
+    close    = Color3.fromRGB(255, 120, 120),
+    footer   = Color3.fromRGB(155, 210, 175),
+}
+local FONT_TITLE = 5
+local FONT_BODY  = 5
+local FONT_MONO  = 5
 
-local function newSquare(color, transparency, filled)
+local function newSquare(color, transparency, filled, rounding)
     local d = Drawing.new("Square")
-    d.Color = color or Color3.fromRGB(24, 24, 24)
+    d.Color = color or C.bg
     d.Transparency = transparency or 0
     d.Filled = filled ~= false
+    d.Thickness = 1
+    if rounding then d.Rounding = rounding end
+    d.Visible = false
+    DrawUI.allObjs[#DrawUI.allObjs + 1] = d
+    return d
+end
+
+local function newCircle(color, radius)
+    local d = Drawing.new("Circle")
+    d.Color = color or C.knob
+    d.Radius = radius or 5
+    d.Filled = true
     d.Thickness = 1
     d.Visible = false
     DrawUI.allObjs[#DrawUI.allObjs + 1] = d
@@ -67,6 +102,7 @@ local function newText(txt, size, color, center)
     d.Color = color or Color3.fromRGB(235, 235, 235)
     d.Center = center or false
     d.Outline = true
+    d.Font = FONT_BODY
     d.Visible = false
     DrawUI.allObjs[#DrawUI.allObjs + 1] = d
     return d
@@ -78,10 +114,11 @@ function DrawUI.toggle(id, label, default)
         id = id,
         label = label,
         value = default and true or false,
-        rowBg = newSquare(Color3.fromRGB(32, 32, 32), 0, true),
-        labelTxt = newText(label, 13, Color3.fromRGB(230, 230, 230), false),
-        box = newSquare(Color3.fromRGB(110, 110, 110), 0, true),
-        stateTxt = newText("ON", 13, Color3.fromRGB(120, 255, 120), false),
+        rowBg = newSquare(C.row, 0, true, 6),
+        labelTxt = newText(label, 13, C.text, false),
+        tagBg = newSquare(C.off, 0, true, 5),
+        stateTxt = newText("OFF", 12, C.muted, true),
+        divider = newSquare(C.divider, 0, true),
     }
     DrawUI.controls[#DrawUI.controls + 1] = ctl
     DrawUI.dirty = true
@@ -98,16 +135,17 @@ function DrawUI.dropdown(id, label, options, defaultIdx)
         options = options,
         value = idx,
         open = false,
-        rowBg = newSquare(Color3.fromRGB(32, 32, 32), 0, true),
-        labelTxt = newText(label, 13, Color3.fromRGB(230, 230, 230), false),
-        selTxt = newText(options[idx], 13, Color3.fromRGB(255, 255, 255), false),
-        arrow = newText("v", 12, Color3.fromRGB(200, 200, 200), true),
+        rowBg = newSquare(C.row, 0, true, 6),
+        labelTxt = newText(label, 13, C.text, false),
+        selTxt = newText(options[idx], 13, C.on, false),
+        arrow = newText("v", 12, C.accent, true),
         optBgs = {},
         optTexts = {},
+        divider = newSquare(C.divider, 0, true),
     }
     for i = 1, #options do
-        ctl.optBgs[i] = newSquare(Color3.fromRGB(26, 26, 26), 0, true)
-        ctl.optTexts[i] = newText(options[i], 13, Color3.fromRGB(215, 215, 215), false)
+        ctl.optBgs[i] = newSquare(C.optBg, 0, true, 4)
+        ctl.optTexts[i] = newText(options[i], 13, C.text, false)
     end
     DrawUI.controls[#DrawUI.controls + 1] = ctl
     DrawUI.dirty = true
@@ -148,47 +186,64 @@ function DrawUI.draw()
     for _, o in ipairs(DrawUI.allObjs) do o.Visible = false end
     if not DrawUI.running or not DrawUI.bg then return end
     if not DrawUI.visible then
+        local tw, th = 76, 22
         DrawUI.reopenBg.Position = Vector2.new(DrawUI.x, DrawUI.y)
-        DrawUI.reopenBg.Size = Vector2.new(60, 18)
+        DrawUI.reopenBg.Size = Vector2.new(tw, th)
         DrawUI.reopenBg.Visible = true
         DrawUI.reopenBorder.Position = Vector2.new(DrawUI.x, DrawUI.y)
-        DrawUI.reopenBorder.Size = Vector2.new(60, 18)
+        DrawUI.reopenBorder.Size = Vector2.new(tw, th)
         DrawUI.reopenBorder.Visible = true
-        DrawUI.reopenTxt.Position = Vector2.new(DrawUI.x + 30, DrawUI.y + 9)
+        DrawUI.reopenDot.Position = Vector2.new(DrawUI.x + 14, DrawUI.y + th * 0.5)
+        DrawUI.reopenDot.Visible = true
+        DrawUI.reopenTxt.Position = Vector2.new(DrawUI.x + tw * 0.5 + 6, DrawUI.y + th * 0.5)
         DrawUI.reopenTxt.Visible = true
-        DrawUI.rows = { { kind = "reopen", x = DrawUI.x, y = DrawUI.y, w = 60, h = 18 } }
+        DrawUI.rows = { { kind = "reopen", x = DrawUI.x, y = DrawUI.y, w = tw, h = th } }
         DrawUI.dirty = false
         return
     end
-    local x, y, w = DrawUI.x, DrawUI.y, DrawUI.w
+    local x, w = DrawUI.x, DrawUI.w
+    local y = DrawUI.y
     local rows = {}
-    DrawUI.bg.Position = Vector2.new(x, y)
-    DrawUI.bg.Size = Vector2.new(w, TITLE_H)
-    DrawUI.bg.Visible = true
-    DrawUI.title.Position = Vector2.new(x + w * 0.5, y + TITLE_H * 0.5)
+    DrawUI.titleBar.Position = Vector2.new(x, y)
+    DrawUI.titleBar.Size = Vector2.new(w, TITLE_H)
+    DrawUI.titleBar.Visible = true
+    DrawUI.titleDot.Position = Vector2.new(x + 16, y + TITLE_H * 0.5)
+    DrawUI.titleDot.Visible = true
+    DrawUI.title.Position = Vector2.new(x + w * 0.5 + 6, y + TITLE_H * 0.5)
     DrawUI.title.Text = DrawUI.titleText
     DrawUI.title.Visible = true
-    DrawUI.closeX.Position = Vector2.new(x + w - 14, y + TITLE_H * 0.5)
+    DrawUI.closeX.Position = Vector2.new(x + w - 16, y + TITLE_H * 0.5)
     DrawUI.closeX.Visible = true
-    rows[#rows + 1] = { kind = "close", x = x + w - 26, y = y, w = 26, h = TITLE_H }
-    rows[#rows + 1] = { kind = "title", x = x, y = y, w = w - 26, h = TITLE_H }
+    rows[#rows + 1] = { kind = "close", x = x + w - 30, y = y, w = 30, h = TITLE_H }
+    rows[#rows + 1] = { kind = "title", x = x, y = y, w = w - 30, h = TITLE_H }
     y = y + TITLE_H
+    local first = true
     for _, ctl in ipairs(DrawUI.controls) do
+        if not first then
+            local div = ctl.divider
+            div.Position = Vector2.new(x + PAD, y - 1)
+            div.Size = Vector2.new(w - PAD * 2, 1)
+            div.Visible = true
+        end
+        first = false
         if ctl.type == "toggle" then
             ctl.rowBg.Position = Vector2.new(x, y)
             ctl.rowBg.Size = Vector2.new(w, ROW_H)
             ctl.rowBg.Visible = true
-            ctl.labelTxt.Position = Vector2.new(x + PAD + 4, y + ROW_H * 0.5 - 7)
+            ctl.labelTxt.Position = Vector2.new(x + PAD, y + ROW_H * 0.5 - 7)
             ctl.labelTxt.Text = ctl.label
             ctl.labelTxt.Visible = true
-            ctl.box.Position = Vector2.new(x + w - 30, y + ROW_H * 0.5 - 7)
-            ctl.box.Size = Vector2.new(14, 14)
-            ctl.box.Color = ctl.value and Color3.fromRGB(90, 220, 120) or Color3.fromRGB(110, 110, 110)
-            ctl.box.Filled = ctl.value
-            ctl.box.Visible = true
+            local tw = 46
+            local th = 18
+            local tx = x + w - tw - PAD
+            local ty = y + ROW_H * 0.5 - th * 0.5
+            ctl.tagBg.Position = Vector2.new(tx, ty)
+            ctl.tagBg.Size = Vector2.new(tw, th)
+            ctl.tagBg.Color = ctl.value and Color3.fromRGB(28, 44, 70) or C.off
+            ctl.tagBg.Visible = true
             ctl.stateTxt.Text = ctl.value and "ON" or "OFF"
-            ctl.stateTxt.Color = ctl.value and Color3.fromRGB(120, 255, 120) or Color3.fromRGB(255, 110, 110)
-            ctl.stateTxt.Position = Vector2.new(x + w - 58, y + ROW_H * 0.5 - 7)
+            ctl.stateTxt.Color = ctl.value and Color3.fromRGB(130, 190, 255) or C.close
+            ctl.stateTxt.Position = Vector2.new(tx + tw * 0.5, ty + th * 0.5)
             ctl.stateTxt.Visible = true
             rows[#rows + 1] = { kind = "toggle", ctl = ctl, x = x, y = y, w = w, h = ROW_H }
             y = y + ROW_H
@@ -196,14 +251,17 @@ function DrawUI.draw()
             ctl.rowBg.Position = Vector2.new(x, y)
             ctl.rowBg.Size = Vector2.new(w, ROW_H)
             ctl.rowBg.Visible = true
-            ctl.labelTxt.Position = Vector2.new(x + PAD + 4, y + ROW_H * 0.5 - 7)
+            ctl.labelTxt.Position = Vector2.new(x + PAD, y + ROW_H * 0.5 - 7)
             ctl.labelTxt.Text = ctl.label
             ctl.labelTxt.Visible = true
             ctl.selTxt.Text = ctl.options[ctl.value] or ""
-            ctl.selTxt.Position = Vector2.new(x + w - 58, y + ROW_H * 0.5 - 7)
+            local ok2, tb = pcall(function() return ctl.selTxt.TextBounds end)
+            local bw = (ok2 and tb and tb.X) or 0
+            if bw <= 0 then bw = #ctl.selTxt.Text * 7 end
+            ctl.selTxt.Position = Vector2.new((x + w - 24) - bw, y + ROW_H * 0.5 - 7)
             ctl.selTxt.Visible = true
             ctl.arrow.Text = ctl.open and "^" or "v"
-            ctl.arrow.Position = Vector2.new(x + w - 16, y + ROW_H * 0.5 - 7)
+            ctl.arrow.Position = Vector2.new(x + w - 12, y + ROW_H * 0.5 - 7)
             ctl.arrow.Visible = true
             rows[#rows + 1] = { kind = "dropdown", ctl = ctl, x = x, y = y, w = w, h = ROW_H }
             y = y + ROW_H
@@ -212,36 +270,79 @@ function DrawUI.draw()
                     local oy = y + (i - 1) * ROW_H
                     local bg = ctl.optBgs[i]
                     bg.Position = Vector2.new(x + 8, oy)
-                    bg.Size = Vector2.new(w - 8, ROW_H)
-                    bg.Color = (i == ctl.value) and Color3.fromRGB(46, 80, 56) or Color3.fromRGB(26, 26, 26)
+                    bg.Size = Vector2.new(w - 16, ROW_H)
+                    bg.Color = (i == ctl.value) and C.optSel or C.optBg
                     bg.Visible = true
                     local ot = ctl.optTexts[i]
                     ot.Position = Vector2.new(x + 18, oy + ROW_H * 0.5 - 7)
+                    ot.Color = (i == ctl.value) and C.on or C.text
                     ot.Visible = true
-                    rows[#rows + 1] = { kind = "opt", ctl = ctl, idx = i, x = x + 8, y = oy, w = w - 8, h = ROW_H }
+                    rows[#rows + 1] = { kind = "opt", ctl = ctl, idx = i, x = x + 8, y = oy, w = w - 16, h = ROW_H }
                 end
                 y = y + #ctl.options * ROW_H
             end
         end
     end
-    DrawUI.bg.Size = Vector2.new(w, y - DrawUI.y)
+    y = y + 6
+    DrawUI.footer.Position = Vector2.new(x + w * 0.5, y + 9)
+    DrawUI.footer.Visible = true
+    local totalH = (y + 18) - DrawUI.y
+    DrawUI.bg.Position = Vector2.new(x, DrawUI.y)
+    DrawUI.bg.Size = Vector2.new(w, totalH)
+    DrawUI.bg.Visible = true
+    DrawUI.border.Position = Vector2.new(x, DrawUI.y)
+    DrawUI.border.Size = Vector2.new(w, totalH)
+    DrawUI.border.Visible = true
+    local sn = 0
+    for sy = DrawUI.y + 2, DrawUI.y + totalH - 2, 3 do
+        sn = sn + 1
+        if sn > #DrawUI.scan then break end
+        local ln = DrawUI.scan[sn]
+        ln.From = Vector2.new(x + 2, sy)
+        ln.To = Vector2.new(x + w - 2, sy)
+        ln.Transparency = 0.5
+        ln.Visible = true
+    end
+    for i = sn + 1, #DrawUI.scan do DrawUI.scan[i].Visible = false end
     DrawUI.rows = rows
     DrawUI.dirty = false
 end
 
 function DrawUI.init(title)
     DrawUI.titleText = title
-    DrawUI.bg = newSquare(Color3.fromRGB(16, 16, 16), 0.25, true)
-    DrawUI.title = newText(title, 14, Color3.fromRGB(255, 255, 255), true)
-    DrawUI.closeX = newText("X", 14, Color3.fromRGB(255, 90, 90), true)
-    DrawUI.reopenTxt = newText("MENU", 13, Color3.fromRGB(255, 255, 255), true)
-    DrawUI.reopenBg = newSquare(Color3.fromRGB(30, 30, 30), 0.15, true)
-    DrawUI.reopenBorder = newSquare(Color3.fromRGB(90, 220, 120), 0, false)
+    DrawUI.bg = newSquare(C.bg, 0.45, true, R)
+    DrawUI.border = newSquare(C.border, 0, false, R)
+    DrawUI.border.Thickness = 1.5
+    DrawUI.border.ZIndex = 5
+    DrawUI.titleBar = newSquare(C.titlebar, 0.32, true, R)
+    pcall(function() DrawUI.titleBar.Corner = "Top" end)
+    DrawUI.titleDot = newCircle(C.accent, 4)
+    DrawUI.title = newText(title, 15, Color3.fromRGB(200, 255, 215), true)
+    DrawUI.title.Font = FONT_TITLE
+    DrawUI.title.Outline = true
+    DrawUI.closeX = newText("X", 14, C.close, true)
+    DrawUI.footer = newText("Drag bar  •  [End] hide", 11, C.footer, true)
+    DrawUI.footer.Font = FONT_MONO
+    DrawUI.scan = {}
+    for i = 1, 90 do
+        local ln = Drawing.new("Line")
+        ln.Color = C.scan
+        ln.Transparency = 0.5
+        ln.Thickness = 1
+        ln.ZIndex = 4
+        ln.Visible = false
+        DrawUI.allObjs[#DrawUI.allObjs + 1] = ln
+        DrawUI.scan[i] = ln
+    end
+    DrawUI.reopenTxt = newText("MENU", 13, Color3.fromRGB(190, 255, 210), true)
+    DrawUI.reopenBg = newSquare(C.bg, 0.4, true, 6)
+    DrawUI.reopenBorder = newSquare(C.border, 0, false, 6)
     DrawUI.reopenBorder.Thickness = 1.5
+    DrawUI.reopenDot = newCircle(C.accent, 3)
     local cam = workspace:FindFirstChild("Camera")
     local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
     DrawUI.x = (vp.X - DrawUI.w) * 0.5
-    DrawUI.y = (vp.Y - 160) * 0.5
+    DrawUI.y = (vp.Y - 200) * 0.5
     DrawUI.dirty = true
 end
 
@@ -273,38 +374,50 @@ function DrawUI.handleClick(mx, my)
     end
 end
 
-task.spawn(function()
-    local lastDown = false
-    local mouse = lp:GetMouse()
-    while DrawUI.running do
-        local down = false
-        pcall(function() down = ismouse1pressed() end)
-        if DrawUI.drag then
-            if down then
-                if mouse then
-                    DrawUI.x = mouse.X - DrawUI.drag.ox
-                    DrawUI.y = mouse.Y - DrawUI.drag.oy
-                    DrawUI.draw()
-                end
-            else
-                DrawUI.drag = nil
+local uiConn
+local lastDown = false
+local mouse = lp:GetMouse()
+uiConn = RunService.RenderStepped:Connect(function(dt)
+    if not DrawUI.running then return end
+    local down = false
+    pcall(function() down = ismouse1pressed() end)
+    DrawUI._dot = (DrawUI._dot or 0) + (dt or 0) * 3
+    local p = 0.5 + 0.5 * math.sin(DrawUI._dot)
+    pcall(function()
+        local col = Color3.fromRGB(120 + p * 80, 255, 150 + p * 50)
+        if DrawUI.visible and DrawUI.titleDot then
+            DrawUI.titleDot.Radius = 3 + p * 2
+            DrawUI.titleDot.Color = col
+        elseif DrawUI.reopenDot then
+            DrawUI.reopenDot.Radius = 2.5 + p * 1.5
+            DrawUI.reopenDot.Color = col
+        end
+    end)
+    if DrawUI.drag then
+        if down then
+            if mouse then
+                DrawUI.x = mouse.X - DrawUI.drag.ox
+                DrawUI.y = mouse.Y - DrawUI.drag.oy
+                DrawUI.draw()
             end
+        else
+            DrawUI.drag = nil
+            DrawUI.dirty = true
         end
-        if down and not lastDown then
-            if mouse then DrawUI.handleClick(mouse.X, mouse.Y) end
-        end
-        lastDown = down
-        task.wait(0.05)
     end
-end)
-
-task.spawn(function()
-    while DrawUI.running do
-        if DrawUI.dirty then
-            DrawUI.draw()
-            DrawUI.dirty = false
-        end
-        task.wait(0.1)
+    if down and not lastDown then
+        if mouse then DrawUI.handleClick(mouse.X, mouse.Y) end
+    end
+    lastDown = down
+    local endNow = false
+    pcall(function() endNow = iskeypressed(0x23) end)
+    if endNow and not DrawUI._endPrev then
+        DrawUI.visible = not DrawUI.visible
+        DrawUI.dirty = true
+    end
+    DrawUI._endPrev = endNow
+    if DrawUI.dirty then
+        DrawUI.draw()
     end
 end)
 
@@ -319,6 +432,7 @@ DrawUI.dropdown("ore_rarity", "Ore Rarity", { "All", "Common", "Uncommon", "Rare
 local menuKeyConn
 local function stopUI()
     DrawUI.running = false
+    if uiConn then uiConn:Disconnect() end
     if menuKeyConn then menuKeyConn:Disconnect() end
     for _, o in ipairs(DrawUI.allObjs) do
         pcall(function() o:Remove() end)
@@ -641,12 +755,5 @@ do
 
     _G.boulderEsp = { stop = stop }
 end
-
-menuKeyConn = UIS.InputBegan:Connect(function(input)
-    if input and input.KeyCode == 0x23 then
-        DrawUI.visible = not DrawUI.visible
-        DrawUI.draw()
-    end
-end)
 
 notify("Enjoy <3", "", 4)
