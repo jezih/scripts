@@ -48,7 +48,7 @@ local accent2 = own(Drawing.new("Square")); accent2.Filled = true; accent2.Color
 local title = own(Drawing.new("Text")); title.Size = 16; title.Color = COL_ACC; title.Outline = true
 title.Text = "Mimsy was here"
 local sub = own(Drawing.new("Text")); sub.Size = 12; sub.Color = COL_DIM; sub.Outline = true
-sub.Text = "ESP for Spooksville"
+sub.Text = "ESP for them mfs"
 local closeT = own(Drawing.new("Text")); closeT.Size = 15; closeT.Color = COL_TXT; closeT.Outline = true
 closeT.Text = "X"
 local pillBg = own(Drawing.new("Square")); pillBg.Filled = true; pillBg.Color = COL_BG; pillBg.Transparency = 1
